@@ -1,1 +1,87 @@
+version: '2'
 
+services:
+  redis:
+    image: redis
+    networks:
+      - back-tier
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - "db-data:/var/lib/postgresql/data"
+      - "./healthchecks:/healthchecks"
+    networks:
+      - back-tier
+    healthcheck:
+      test: /healthchecks/postgres.sh
+      interval: "5s"
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - back-tier
+
+  vote:
+    build:
+      context: .
+      dockerfile: ./vote/Dockerfile
+    volumes:
+      - ./vote:/usr/local/app
+    expose:
+      - "5002"
+    networks:
+      - front-tier
+      - back-tier
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  seed-data:
+    build:
+      context: .
+      dockerfile: ./seed-data/Dockerfile
+    profiles: ["seed"]
+    depends_on:
+      vote:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - front-tier
+
+  result:
+    build:
+      context: .
+      dockerfile: ./result/Dockerfile
+    volumes:
+      - ./result:/usr/local/app
+    ports:
+      - "5001:80"
+      - "127.0.0.1:9229:9229"
+    entrypoint: nodemon --inspect=0.0.0.0 server.js 
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - back-tier
+
+networks:
+  front-tier:
+  back-tier:
+
+volumes:
+  db-data:

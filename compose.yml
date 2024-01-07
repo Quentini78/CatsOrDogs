@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:latest
+    networks:
+      - back-tier
+    volumes:
+      - ./healthchecks:/healthchecks
+    healthcheck:
+      test: /healthchecks/redis.sh
+      interval: "5s"
+
+  db:
+    image: postgres:15-alpine
+    networks:
+      - back-tier
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./healthchecks:/healthchecks
+    healthcheck:
+      test: /healthchecks/postgres.sh
+      interval: "5s"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      target: build
+    depends_on:
+      - redis
+      - db
+    networks:
+      - back-tier
+
+  vote:
+    build:
+      context: .
+      dockerfile: Dockerfile.vote
+    volumes:
+      - ./vote:/usr/local/app
+    expose:
+      - "5002"
+    networks:
+      - front-tier
+      - back-tier
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  result:
+    build:
+      context: .
+      dockerfile: Dockerfile.result
+    depends_on:
+      - db
+    volumes:
+      - ./result:/usr/local/app
+    ports:
+      - "5001:80"
+      - "127.0.0.1:9229:9229"
+    networks:
+      - back-tier
+
+  seed-data:
+    build:
+      context: .
+      dockerfile: Dockerfile.seed-data
+    depends_on:
+      - vote
+    networks:
+      - front-tier
+
+volumes:
+  db-data:
+
+networks:
+  back-tier:
+  front-tier:
+  cats-or-dogs-network:
+    driver: bridge
