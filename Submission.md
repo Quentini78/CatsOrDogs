@@ -114,10 +114,10 @@ docker stop db redis result vote worker
 
 ### 2. Création du Docker compose
 ```bash
-nano docker-compose.yml
+nano compose.yml
 ```
 ```yml
-#docker-compose.yml
+#compose.yml
 version: '3'
 
 services:
