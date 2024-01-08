@@ -1,2 +1,3 @@
 # CatsOrDogs
-Projet Virtu
+Projet Virtu G-49
+Fais par Quentin Sarger, Fadi El Zein, William Lu
